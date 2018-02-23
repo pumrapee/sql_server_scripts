@@ -38,6 +38,7 @@ AS
 		ELSE
 		BEGIN
 			SELECT @var=ikey FROM ikey_table WHERE hashed = @hashed;
+			SET @sql3 = 'UPDATE ' + @tablename + ' SET ikey = ' + cast(@var AS nvarchar(10)) + ' WHERE hashed = ''' + @hashed + ''''
 			EXEC SP_EXECUTESQL @sql3
 		END
 		FETCH NEXT FROM @db_cursor INTO @hashed;
