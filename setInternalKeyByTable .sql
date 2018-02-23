@@ -10,8 +10,13 @@ AS
 	DECLARE @query nvarchar(100)
 	DECLARE @seq_check int
 	DECLARE @var int
-	SET @sql2 = 'ALTER TABLE ' + @tablename + ' ADD ikey int'
-	EXEC SP_EXECUTESQL @sql2
+	BEGIN TRY
+		SET @sql2 = 'ALTER TABLE ' + @tablename + ' ADD ikey int'
+		EXEC SP_EXECUTESQL @sql2
+	END TRY
+	BEGIN CATCH
+		SELECT 'CONTINUE'
+	END CATCH
 	SET @seq_check = IDENT_CURRENT('ikey_table')
 	SET @query = 'SELECT ' + @colname + ' FROM ' + @tablename;
 	SET @sql = 'SET @cursor = CURSOR FOR ' + @query + ' OPEN @cursor;';
@@ -19,28 +24,19 @@ AS
 	FETCH NEXT FROM @db_cursor INTO @hashed
 	WHILE @@FETCH_STATUS = 0  
 	BEGIN
-		IF NOT EXISTS (SELECT hashed FROM ikey_table WHERE hashed = @hashed)
-		BEGIN
-			BEGIN TRY 
-				INSERT INTO ikey_table (hashed) VALUES (@hashed);
-				SET @seq_check = IDENT_CURRENT('ikey_table')
-				SET @var = @seq_check
-				SET @sql3 = 'UPDATE ' + @tablename + ' SET ikey = ' + cast(@var AS nvarchar(10)) + ' WHERE hashed = ''' + @hashed + ''''
-				EXEC SP_EXECUTESQL @sql3
-			END TRY
-			BEGIN CATCH
-				SET @sql = 'DBCC CHECKIDENT ("ikey_table", RESEED, ' + CAST(@seq_check AS nvarchar(50)) + ');'
-				SET @sql3 = 'UPDATE ' + @tablename + ' SET ikey = ' + cast(@var AS nvarchar(10)) + ' WHERE hashed = ''' + @hashed + ''''
-				EXEC SP_EXECUTESQL @sql3
-				SELECT ERROR_NUMBER() AS ErrorNumber;
-			END CATCH;
-		END
-		ELSE
-		BEGIN
+		BEGIN TRY 
+			INSERT INTO ikey_table (hashed) VALUES (@hashed);
+			SET @seq_check = IDENT_CURRENT('ikey_table')
+			SET @var = @seq_check
+			SET @sql3 = 'UPDATE ' + @tablename + ' SET ikey = ' + cast(@var AS nvarchar(10)) + ' WHERE hashed = ''' + @hashed + ''''
+			EXEC SP_EXECUTESQL @sql3
+		END TRY
+		BEGIN CATCH
+			SET @sql = 'DBCC CHECKIDENT ("ikey_table", RESEED, ' + CAST(@seq_check AS nvarchar(50)) + ');'
 			SELECT @var=ikey FROM ikey_table WHERE hashed = @hashed;
 			SET @sql3 = 'UPDATE ' + @tablename + ' SET ikey = ' + cast(@var AS nvarchar(10)) + ' WHERE hashed = ''' + @hashed + ''''
 			EXEC SP_EXECUTESQL @sql3
-		END
+		END CATCH;
 		FETCH NEXT FROM @db_cursor INTO @hashed;
 	END;
 	CLOSE @db_cursor;
