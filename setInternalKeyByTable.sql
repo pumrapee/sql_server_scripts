@@ -23,22 +23,23 @@ AS
 	BEGIN CATCH
 		SELECT 'CONTINUE'
 	END CATCH
+	SET @seq_check = IDENT_CURRENT('ikey_table')
 	SET @query = 'SELECT ' + @colname + ' FROM ' + @tablename
 	SET @sql = 'SET @cursor = CURSOR FOR ' + @query + ' OPEN @cursor;'
 	EXEC SP_EXECUTESQL @sql, N'@cursor cursor output', @db_cursor output
 	FETCH NEXT FROM @db_cursor INTO @hashed
 	WHILE @@FETCH_STATUS = 0  
 	BEGIN
-		SET @seq_check = IDENT_CURRENT('ikey_table')
 		BEGIN TRY 
 			INSERT INTO ikey_table (hashed) VALUES (@hashed)
-			SET @var = @seq_check
 			SET @seq_check = IDENT_CURRENT('ikey_table')
+			SET @var = @seq_check
 		END TRY
 		BEGIN CATCH
 			SET @sql = 'DBCC CHECKIDENT ("ikey_table", RESEED, ' + CAST(@seq_check AS nvarchar(50)) + ');'
 			EXEC SP_EXECUTESQL @sql
 			SELECT @var=ikey FROM ikey_table WHERE hashed = @hashed
+			SET @seq_check = IDENT_CURRENT('ikey_table')
 		END CATCH
 		SET @sql = 'UPDATE ' + @tablename + ' SET ikey = ' + cast(@var AS nvarchar(10)) + ' WHERE hashed = ''' + @hashed + ''''
 		EXEC SP_EXECUTESQL @sql
@@ -57,3 +58,4 @@ GO
 CREATE UNIQUE INDEX hashed_index 
 ON ikey_table (hashed)
 GO
+
